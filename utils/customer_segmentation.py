@@ -32,6 +32,23 @@ def segment_customers(model, X, original_data):
     result_df = original_data.copy()
     result_df['Churn_Probability'] = churn_prob
     
+    # Add CustomerID column if it doesn't exist
+    if 'CustomerID' not in result_df.columns:
+        result_df['CustomerID'] = [f"CUST_{i}" for i in range(len(result_df))]
+    
+    # Handle personal information columns - check if they exist and create placeholders if not
+    # This ensures the system works offline without requiring real personal data
+    personal_info_cols = ['First_Name', 'Surname', 'Street_Address', 'Gender', 'Location', 'Activation_Date', 'Plan_Type']
+    for col in personal_info_cols:
+        if col not in result_df.columns:
+            # Create generic placeholder data that's clearly marked as non-personal data
+            if col in ['First_Name', 'Surname', 'Street_Address', 'Gender', 'Location']:
+                result_df[col] = "N/A"  # Non-identifiable placeholder for text fields
+            elif col == 'Activation_Date':
+                result_df[col] = "2023-01-01"  # Default date
+            elif col == 'Plan_Type':
+                result_df[col] = "Standard"  # Default plan
+    
     # Segment customers based on churn probability
     result_df['Risk_Category'] = pd.cut(
         result_df['Churn_Probability'],
@@ -202,8 +219,9 @@ def plot_customer_segments(segments_df):
         
         st.plotly_chart(fig)
         
-        # Show cluster characteristics
+        # Show cluster characteristics - safely get only available columns
         st.subheader("Cluster Characteristics")
-        
-        cluster_profiles = segments_df.groupby('Cluster')[top_features].mean().reset_index()
-        st.dataframe(cluster_profiles)
+        available_features = [feat for feat in top_features if feat in segments_df.columns]
+        if available_features:
+            cluster_profiles = segments_df.groupby('Cluster')[available_features].mean().reset_index()
+            st.dataframe(cluster_profiles)
