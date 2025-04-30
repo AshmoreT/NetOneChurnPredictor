@@ -12,28 +12,13 @@ from utils.model_training import train_logistic_regression, train_random_forest,
 from utils.model_evaluation import evaluate_model, confusion_matrix_plot, roc_curve_plot, precision_recall_curve_plot
 from utils.model_interpretation import feature_importance_plot, shap_analysis
 from utils.customer_segmentation import segment_customers, plot_customer_segments
+from utils.authentication import render_login_page, check_authentication, logout
 
 # Set page configuration
 st.set_page_config(
     page_title="NetOne Churn Prediction System",
     page_icon="📊",
     layout="wide"
-)
-
-# Application title and introduction
-st.title("NetOne Telecommunications Churn Prediction System")
-
-st.markdown("""
-This application helps NetOne predict customer churn and identify key factors that contribute to customer attrition.
-Upload your customer data, analyze patterns, train prediction models, and get actionable insights.
-""")
-
-# Sidebar for navigation
-st.sidebar.title("Navigation")
-page = st.sidebar.radio(
-    "Select a page",
-    ["Data Upload & Preprocessing", "Exploratory Data Analysis", "Model Training", 
-     "Model Evaluation", "Feature Importance", "Customer Segmentation", "Actionable Insights"]
 )
 
 # Initialize session state variables if they don't exist
@@ -51,6 +36,35 @@ if 'evaluation_results' not in st.session_state:
     st.session_state.evaluation_results = {}
 if 'feature_importance' not in st.session_state:
     st.session_state.feature_importance = {}
+
+# Check if user is authenticated
+if not check_authentication():
+    render_login_page()
+    # Exit early to prevent showing application content
+    st.stop()
+
+# User is authenticated, show main application
+# Application title and introduction
+st.title("NetOne Telecommunications Churn Prediction System")
+
+st.markdown("""
+This application helps NetOne predict customer churn and identify key factors that contribute to customer attrition.
+Upload your customer data, analyze patterns, train prediction models, and get actionable insights.
+""")
+
+# Display user info and logout button in sidebar
+st.sidebar.title(f"Welcome, {st.session_state.username}")
+st.sidebar.write(f"Role: {st.session_state.role}")
+if logout():
+    st.rerun()
+
+# Sidebar for navigation
+st.sidebar.title("Navigation")
+page = st.sidebar.radio(
+    "Select a page",
+    ["Data Upload & Preprocessing", "Exploratory Data Analysis", "Model Training", 
+     "Model Evaluation", "Feature Importance", "Customer Segmentation", "Actionable Insights"]
+)
 
 # Data Upload & Preprocessing
 if page == "Data Upload & Preprocessing":

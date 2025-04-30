@@ -4,7 +4,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
-import shap
+import seaborn as sns
 
 def feature_importance_plot(feature_importance_df):
     """
@@ -44,7 +44,7 @@ def feature_importance_plot(feature_importance_df):
 
 def shap_analysis(model, X, model_name):
     """
-    Perform SHAP analysis for model interpretation
+    Alternative feature importance analysis without SHAP library
     
     Parameters:
     -----------
@@ -55,87 +55,102 @@ def shap_analysis(model, X, model_name):
     model_name : str
         Name of the model for display purposes
     """
-    # Sample data for SHAP analysis if dataset is too large
+    st.subheader("Feature Importance Analysis")
+    
+    # Sample data if dataset is too large
     if X.shape[0] > 1000:
         X_sample = X.sample(n=1000, random_state=42)
     else:
         X_sample = X
     
-    # Create SHAP explainer based on model type
+    # Get feature importance based on model type
+    feature_importance = None
+    
     if model_name == "Logistic Regression":
-        explainer = shap.LinearExplainer(model, X_sample)
+        # For logistic regression, we use the absolute coefficients
+        if hasattr(model, 'coef_'):
+            feature_importance = pd.DataFrame({
+                'Feature': X.columns,
+                'Importance': np.abs(model.coef_[0])
+            })
+    
     elif model_name in ["Random Forest", "XGBoost"]:
-        explainer = shap.TreeExplainer(model)
-    else:
-        explainer = shap.Explainer(model, X_sample)
+        # For tree-based models, use the feature_importances_ attribute
+        if hasattr(model, 'feature_importances_'):
+            feature_importance = pd.DataFrame({
+                'Feature': X.columns,
+                'Importance': model.feature_importances_
+            })
     
-    # Calculate SHAP values
-    shap_values = explainer.shap_values(X_sample)
-    
-    # If shap_values is a list (for multi-class), take the values for class 1
-    if isinstance(shap_values, list):
-        shap_values = shap_values[1]
-    
-    # Convert to DataFrame for easier manipulation
-    shap_df = pd.DataFrame(shap_values, columns=X_sample.columns)
-    
-    # Calculate mean absolute SHAP values for each feature
-    mean_abs_shap = np.abs(shap_df).mean().sort_values(ascending=False)
-    
-    # Create bar plot for mean absolute SHAP values
-    st.subheader("SHAP Feature Importance")
-    
-    fig = px.bar(
-        x=mean_abs_shap.values,
-        y=mean_abs_shap.index,
-        orientation='h',
-        title='Mean |SHAP Value| (impact on model output)',
-        labels={'x': 'mean |SHAP value|', 'y': 'Feature'},
-        color=mean_abs_shap.values,
-        color_continuous_scale='RdBu_r'
-    )
-    
-    fig.update_layout(height=600, width=800)
-    st.plotly_chart(fig)
-    
-    # Create summary plot using matplotlib
-    st.subheader("SHAP Summary Plot")
-    
-    # Save the figure to display with Streamlit
-    fig, ax = plt.subplots(figsize=(10, 8))
-    shap.summary_plot(shap_values, X_sample, plot_type="bar", show=False)
-    st.pyplot(fig)
-    
-    # SHAP dependence plots for top features
-    st.subheader("SHAP Dependence Plots")
-    st.write("These plots show how the feature value affects the model prediction.")
-    
-    top_features = mean_abs_shap.head(5).index.tolist()
-    
-    for feature in top_features:
-        st.write(f"### Dependence Plot for {feature}")
+    if feature_importance is not None:
+        # Sort by importance
+        feature_importance = feature_importance.sort_values('Importance', ascending=False)
         
-        fig, ax = plt.subplots(figsize=(10, 6))
-        shap.dependence_plot(feature, shap_values, X_sample, show=False)
+        # Plot feature importance
+        fig = px.bar(
+            feature_importance.head(15),
+            x='Importance',
+            y='Feature',
+            orientation='h',
+            title=f'Feature Importance for {model_name}',
+            color='Importance',
+            color_continuous_scale='viridis'
+        )
+        
+        fig.update_layout(
+            xaxis_title='Importance',
+            yaxis_title='Feature',
+            height=600,
+            width=800
+        )
+        
+        st.plotly_chart(fig)
+        
+        # Display importance values
+        st.subheader("Feature Importance Values")
+        st.dataframe(feature_importance)
+        
+        # Feature correlation with importance
+        st.subheader("Feature Correlation Analysis")
+        
+        # Calculate correlation matrix
+        corr_matrix = X_sample.corr()
+        
+        # Plot heatmap
+        fig, ax = plt.subplots(figsize=(10, 8))
+        mask = np.triu(np.ones_like(corr_matrix, dtype=bool))
+        heatmap = sns.heatmap(
+            corr_matrix,
+            mask=mask,
+            annot=True,
+            fmt=".2f",
+            cmap="coolwarm",
+            vmin=-1,
+            vmax=1,
+            linewidths=0.5,
+            ax=ax
+        )
+        plt.title("Feature Correlation Matrix")
         st.pyplot(fig)
-    
-    # SHAP individual prediction explanation
-    st.subheader("Individual Prediction Explanation")
-    
-    # Let user select a sample to explain
-    sample_index = st.slider("Select a sample to explain", 0, len(X_sample) - 1, 0)
-    
-    # Display the selected sample
-    st.write("Selected Sample Features:")
-    st.dataframe(X_sample.iloc[sample_index:sample_index+1])
-    
-    # Plot the SHAP values for the selected sample
-    fig, ax = plt.subplots(figsize=(10, 6))
-    shap.force_plot(
-        explainer.expected_value,
-        shap_values[sample_index, :],
-        X_sample.iloc[sample_index, :],
-        matplotlib=True,
-        show=False
-    )
-    st.pyplot(fig)
+        
+        # Top correlated features
+        top_features = feature_importance['Feature'].head(5).tolist()
+        
+        # Plot distributions of top features
+        st.subheader("Top Feature Distributions")
+        
+        for feature in top_features:
+            if feature in X_sample.columns:
+                st.write(f"### Distribution of {feature}")
+                
+                fig = px.histogram(
+                    X_sample,
+                    x=feature,
+                    title=f'Distribution of {feature}',
+                    marginal='box',
+                    nbins=30
+                )
+                
+                st.plotly_chart(fig)
+    else:
+        st.warning("Feature importance not available for this model type.")
