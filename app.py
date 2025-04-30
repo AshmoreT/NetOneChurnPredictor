@@ -413,12 +413,12 @@ elif page == "Model Training":
                             with open(model_file, 'wb') as f:
                                 pickle.dump(model, f)
                             
-                            # Save model to database
-                            if 'dataset_id' in st.session_state:
+                            # Preliminary evaluation metrics
+                            evaluation_results = evaluate_model(model, X_train, X_test, y_train, y_test)
+                            
+                            # Save model to database if user exists
+                            if user and hasattr(user, 'id') and 'dataset_id' in st.session_state:
                                 dataset_id = st.session_state.dataset_id
-                                
-                                # Preliminary evaluation metrics
-                                evaluation_results = evaluate_model(model, X_train, X_test, y_train, y_test)
                                 
                                 model_success, model_id = add_model(
                                     name=f"Random Forest Model ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')})",
@@ -438,12 +438,17 @@ elif page == "Model Training":
                                     st.session_state.model_id = model_id
                                     st.success("Random Forest model trained successfully and saved to database!")
                                 else:
-                                    st.success("Random Forest model trained successfully but failed to save to database!")
+                                    st.success("Random Forest model trained successfully!")
+                                    st.warning("Failed to save model to database.")
+                            elif not user or not hasattr(user, 'id'):
+                                st.success("Random Forest model trained successfully and saved to file!")
+                                st.warning("Model not saved to database: User profile not found.")
                             else:
-                                st.success("Random Forest model trained successfully! (Dataset not found in database)")
+                                st.success("Random Forest model trained successfully and saved to file!")
+                                st.warning("Model not saved to database: No dataset ID found.")
                         except Exception as e:
                             st.success("Random Forest model trained successfully!")
-                            st.warning(f"Failed to save model to database: {str(e)}")
+                            st.warning(f"Failed to save model: {str(e)}")
             
             elif model_type == "XGBoost":
                 n_estimators = st.number_input("Number of boosting rounds", 10, 500, 100, 10)
@@ -480,12 +485,12 @@ elif page == "Model Training":
                             with open(model_file, 'wb') as f:
                                 pickle.dump(model, f)
                             
-                            # Save model to database
-                            if 'dataset_id' in st.session_state:
+                            # Preliminary evaluation metrics
+                            evaluation_results = evaluate_model(model, X_train, X_test, y_train, y_test)
+                            
+                            # Save model to database if user exists
+                            if user and hasattr(user, 'id') and 'dataset_id' in st.session_state:
                                 dataset_id = st.session_state.dataset_id
-                                
-                                # Preliminary evaluation metrics
-                                evaluation_results = evaluate_model(model, X_train, X_test, y_train, y_test)
                                 
                                 model_success, model_id = add_model(
                                     name=f"XGBoost Model ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')})",
@@ -505,12 +510,17 @@ elif page == "Model Training":
                                     st.session_state.model_id = model_id
                                     st.success("XGBoost model trained successfully and saved to database!")
                                 else:
-                                    st.success("XGBoost model trained successfully but failed to save to database!")
+                                    st.success("XGBoost model trained successfully!")
+                                    st.warning("Failed to save model to database.")
+                            elif not user or not hasattr(user, 'id'):
+                                st.success("XGBoost model trained successfully and saved to file!")
+                                st.warning("Model not saved to database: User profile not found.")
                             else:
-                                st.success("XGBoost model trained successfully! (Dataset not found in database)")
+                                st.success("XGBoost model trained successfully and saved to file!")
+                                st.warning("Model not saved to database: No dataset ID found.")
                         except Exception as e:
                             st.success("XGBoost model trained successfully!")
-                            st.warning(f"Failed to save model to database: {str(e)}")
+                            st.warning(f"Failed to save model: {str(e)}")
         
         # Display trained models
         st.subheader("Trained Models")
@@ -685,6 +695,31 @@ elif page == "Customer Segmentation":
             st.subheader("High-Risk Customers (Top 10)")
             high_risk = segments_df[segments_df['Risk_Category'] == 'High Risk'].sort_values('Churn_Probability', ascending=False).head(10)
             st.dataframe(high_risk)
+            
+            # Save predictions to database
+            if 'model_id' in st.session_state:
+                try:
+                    model_id = st.session_state.model_id
+                    
+                    # Save high risk customers to the database
+                    for idx, row in high_risk.iterrows():
+                        customer_id = str(row.get('CustomerID', f"CUST_{idx}"))
+                        features = json.dumps({col: str(row[col]) for col in X.columns if col in row})
+                        prediction = float(row['Churn_Probability'])
+                        is_churn = bool(row['Risk_Category'] == 'High Risk')
+                        
+                        # Add prediction to database
+                        add_prediction(
+                            model_id=model_id,
+                            customer_id=customer_id,
+                            features=features,
+                            prediction=prediction,
+                            is_churn=is_churn
+                        )
+                    
+                    st.success(f"Saved {len(high_risk)} high-risk customer predictions to database")
+                except Exception as e:
+                    st.warning(f"Failed to save predictions to database: {str(e)}")
             
             # Download segmentation results
             segment_csv = segments_df.to_csv(index=False)
