@@ -32,8 +32,15 @@ def train_logistic_regression(X, y, test_size=0.2, random_state=42, C=1.0, solve
     tuple
         (model, X_train, X_test, y_train, y_test)
     """
+    # Check if stratification is possible (need at least 2 samples per class)
+    class_counts = y.value_counts()
+    stratify_param = y if class_counts.min() >= 2 else None
+    
+    if stratify_param is None:
+        st.warning("Unable to stratify due to insufficient samples in one or more classes. Using random split instead.")
+    
     # Split the data
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state, stratify=y)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state, stratify=stratify_param)
     
     # Initialize and train the model
     model = LogisticRegression(C=C, solver=solver, max_iter=max_iter, random_state=random_state)
@@ -69,8 +76,15 @@ def train_random_forest(X, y, test_size=0.2, random_state=42, n_estimators=100, 
     tuple
         (model, X_train, X_test, y_train, y_test)
     """
+    # Check if stratification is possible (need at least 2 samples per class)
+    class_counts = y.value_counts()
+    stratify_param = y if class_counts.min() >= 2 else None
+    
+    if stratify_param is None:
+        st.warning("Unable to stratify due to insufficient samples in one or more classes. Using random split instead.")
+    
     # Split the data
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state, stratify=y)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state, stratify=stratify_param)
     
     # Initialize and train the model
     model = RandomForestClassifier(
@@ -112,8 +126,15 @@ def train_xgboost(X, y, test_size=0.2, random_state=42, n_estimators=100, max_de
     tuple
         (model, X_train, X_test, y_train, y_test)
     """
+    # Check if stratification is possible (need at least 2 samples per class)
+    class_counts = y.value_counts()
+    stratify_param = y if class_counts.min() >= 2 else None
+    
+    if stratify_param is None:
+        st.warning("Unable to stratify due to insufficient samples in one or more classes. Using random split instead.")
+    
     # Split the data
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state, stratify=y)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=random_state, stratify=stratify_param)
     
     # Initialize and train the model
     model = xgb.XGBClassifier(

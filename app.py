@@ -49,17 +49,153 @@ if not check_authentication():
     st.stop()
 
 # User is authenticated, show main application
+# Get screen width for responsive design
 # Application title and introduction
 st.title("NetOne Telecommunications Churn Prediction System")
 
-st.markdown("""
-This application helps NetOne predict customer churn and identify key factors that contribute to customer attrition.
-Upload your customer data, analyze patterns, train prediction models, and get actionable insights.
-""")
+# Sidebar for navigation
+st.sidebar.title("Navigation")
+page = st.sidebar.radio(
+    "Select a page",
+    ["Home Dashboard", "Data Upload & Preprocessing", "Exploratory Data Analysis", "Model Training", 
+     "Model Evaluation", "Feature Importance", "Customer Segmentation", "Actionable Insights"]
+)
 
-# Display user info and logout button in sidebar
-st.sidebar.title(f"Welcome, {st.session_state.username}")
-st.sidebar.write(f"Role: {st.session_state.role}")
+# Professional home page and dashboard
+if page == "Home Dashboard":
+    st.header("Welcome to NetOne Churn Prediction System")
+    
+    # Create a professional layout with cards/sections
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("About the System")
+        st.markdown("""
+        <div style="background-color:#f0f2f6;padding:20px;border-radius:10px;">
+        <h4>Predict Customer Churn with Advanced Analytics</h4>
+        <p>NetOne's Churn Prediction System leverages advanced machine learning algorithms to identify at-risk customers 
+        before they leave. Our system analyzes customer behavior patterns, service usage, and historical data to provide 
+        actionable insights for reducing customer attrition.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div style="background-color:#f0f2f6;padding:20px;border-radius:10px;margin-top:20px;">
+        <h4>Works 100% Offline</h4>
+        <p>This system is designed to operate entirely offline with no external dependencies. 
+        Your sensitive customer data never leaves your secure environment, ensuring complete 
+        privacy and compliance with data protection regulations.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.subheader("Key Features")
+        st.markdown("""
+        <div style="background-color:#f0f2f6;padding:20px;border-radius:10px;">
+        <h4>Complete ML Pipeline</h4>
+        <ul>
+            <li><strong>Data Preprocessing:</strong> Clean, transform and prepare your data</li>
+            <li><strong>Exploratory Analysis:</strong> Visualize and understand patterns</li>
+            <li><strong>Model Training:</strong> Build powerful predictive models</li>
+            <li><strong>Customer Segmentation:</strong> Identify distinct customer groups</li>
+            <li><strong>Actionable Insights:</strong> Get recommendations to reduce churn</li>
+        </ul>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div style="background-color:#f0f2f6;padding:20px;border-radius:10px;margin-top:20px;">
+        <h4>Quick Start</h4>
+        <p>Navigate to <strong>Data Upload & Preprocessing</strong> in the sidebar to begin. 
+        Upload your customer dataset in CSV or Excel format, then follow the guided workflow to 
+        generate predictions and insights.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # System usage stats and charts
+    st.subheader("System Overview")
+    
+    # Create some statistics about current state
+    try:
+        user = get_user_by_username(st.session_state.username)
+        if user and hasattr(user, 'id'):
+            datasets = get_user_datasets(user.id)
+            models = get_user_models(user.id)
+            
+            # Display statistics
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric(label="Saved Datasets", value=len(datasets) if datasets else 0)
+            
+            with col2:
+                st.metric(label="Trained Models", value=len(models) if models else 0)
+            
+            with col3:
+                # Calculate average model accuracy if models exist
+                if models and len(models) > 0:
+                    avg_accuracy = sum(model.accuracy for model in models) / len(models)
+                    st.metric(label="Avg. Model Accuracy", value=f"{avg_accuracy:.2%}")
+                else:
+                    st.metric(label="Avg. Model Accuracy", value="N/A")
+            
+            with col4:
+                # Show when the last model was created
+                if models and len(models) > 0:
+                    latest_model = max(models, key=lambda x: x.created_at)
+                    days_ago = (datetime.datetime.utcnow() - latest_model.created_at).days
+                    st.metric(label="Last Model Created", value=f"{days_ago} days ago" if days_ago > 0 else "Today")
+                else:
+                    st.metric(label="Last Model Created", value="N/A")
+            
+            # Show recent activity if available
+            if models and len(models) > 0:
+                st.subheader("Recent Models")
+                recent_models_df = pd.DataFrame({
+                    "Model Name": [model.name for model in models[:3]],
+                    "Type": [model.model_type for model in models[:3]],
+                    "Accuracy": [f"{model.accuracy:.2%}" for model in models[:3]],
+                    "Created": [model.created_at.strftime("%Y-%m-%d") for model in models[:3]]
+                })
+                st.dataframe(recent_models_df)
+        
+        else:
+            st.info("No user data found. Start by uploading a dataset and training models.")
+    
+    except Exception as e:
+        st.warning(f"Could not load system statistics: {str(e)}")
+        
+    # Help section
+    st.subheader("Need Help?")
+    with st.expander("How to use this system"):
+        st.markdown("""
+        1. **Upload your data**: Go to the Data Upload & Preprocessing page and upload your customer dataset
+        2. **Explore your data**: Use the Exploratory Data Analysis page to understand patterns and relationships
+        3. **Train models**: Select the best features and train different models to predict churn
+        4. **Evaluate performance**: Compare models and select the best performing one
+        5. **Generate insights**: Use the Customer Segmentation and Actionable Insights pages to develop retention strategies
+        """)
+    
+    with st.expander("About the models"):
+        st.markdown("""
+        This system offers three powerful machine learning algorithms:
+        
+        - **Logistic Regression**: Simple, interpretable model good for understanding feature importance
+        - **Random Forest**: Ensemble method that handles non-linear relationships well
+        - **XGBoost**: Advanced gradient boosting algorithm for maximum prediction accuracy
+        
+        Each model has strengths and weaknesses. We recommend comparing their performance on your specific dataset.
+        """)
+else:
+    # Display user info and logout button in sidebar (outside the page conditional)
+    if page != "Home Dashboard":  # Only show the welcome message if not on home page
+        st.sidebar.title(f"Welcome, {st.session_state.username}")
+        st.sidebar.write(f"Role: {st.session_state.role}")
+    else:
+        # If on home page, just show the logout button without duplicating welcome
+        st.sidebar.title("User Options")
+
+# Add logout button
 if logout():
     st.rerun()
 
@@ -90,13 +226,7 @@ with st.sidebar.expander("Your Saved Data"):
     except Exception as e:
         st.write(f"Error loading saved data: {str(e)}")
 
-# Sidebar for navigation
-st.sidebar.title("Navigation")
-page = st.sidebar.radio(
-    "Select a page",
-    ["Data Upload & Preprocessing", "Exploratory Data Analysis", "Model Training", 
-     "Model Evaluation", "Feature Importance", "Customer Segmentation", "Actionable Insights"]
-)
+# Note: Navigation is already handled at the top of the file
 
 # Data Upload & Preprocessing
 if page == "Data Upload & Preprocessing":
