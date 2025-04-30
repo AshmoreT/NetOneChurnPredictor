@@ -6,6 +6,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 import io
 import os
+import json
+import pickle
+import datetime
+
 from utils.data_preprocessing import preprocess_data, handle_missing_values, encode_categorical_features
 from utils.exploratory_data_analysis import plot_churn_distribution, plot_feature_correlation, plot_categorical_features, plot_numerical_features
 from utils.model_training import train_logistic_regression, train_random_forest, train_xgboost
@@ -13,6 +17,7 @@ from utils.model_evaluation import evaluate_model, confusion_matrix_plot, roc_cu
 from utils.model_interpretation import feature_importance_plot, shap_analysis
 from utils.customer_segmentation import segment_customers, plot_customer_segments
 from utils.authentication import render_login_page, check_authentication, logout
+from utils.database import get_user_by_username, add_dataset, add_model, add_prediction, get_user_datasets, get_user_models
 
 # Set page configuration
 st.set_page_config(
@@ -57,6 +62,33 @@ st.sidebar.title(f"Welcome, {st.session_state.username}")
 st.sidebar.write(f"Role: {st.session_state.role}")
 if logout():
     st.rerun()
+
+# Show user's saved data and models
+with st.sidebar.expander("Your Saved Data"):
+    try:
+        user = get_user_by_username(st.session_state.username)
+        if user and hasattr(user, 'id'):
+            # User exists and has an ID
+            datasets = get_user_datasets(user.id)
+            if datasets:
+                st.write("Your Datasets:")
+                for dataset in datasets:
+                    st.write(f"- {dataset.name} ({dataset.rows} rows)")
+            else:
+                st.write("No datasets saved yet.")
+                
+            models = get_user_models(user.id)
+            if models:
+                st.write("Your Models:")
+                for model in models:
+                    st.write(f"- {model.name} ({model.model_type})")
+                    st.write(f"  Accuracy: {model.accuracy:.4f}")
+            else:
+                st.write("No models saved yet.")
+        else:
+            st.write("User profile not found in database.")
+    except Exception as e:
+        st.write(f"Error loading saved data: {str(e)}")
 
 # Sidebar for navigation
 st.sidebar.title("Navigation")
@@ -150,7 +182,44 @@ if page == "Data Upload & Preprocessing":
                     st.subheader("Preprocessed Data Preview")
                     st.dataframe(preprocessed_data.head())
                     
-                    st.success("Data preprocessing completed successfully!")
+                    # Save dataset to database
+                    try:
+                        # Get user info
+                        user = get_user_by_username(st.session_state.username)
+                        
+                        if user and hasattr(user, 'id'):
+                            # Define a filename for the data
+                            dataset_name = f"churn_dataset_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                            dataset_path = f"datasets/{dataset_name}"
+                            
+                            # Create the directory if it doesn't exist
+                            os.makedirs("datasets", exist_ok=True)
+                            
+                            # Save the dataset to a file
+                            data.to_csv(dataset_path, index=False)
+                            
+                            # Save to database
+                            dataset_success, dataset_id = add_dataset(
+                                name=dataset_name,
+                                description=f"Churn dataset uploaded on {datetime.datetime.now().strftime('%Y-%m-%d')}",
+                                user_id=user.id,
+                                file_path=dataset_path,
+                                rows=data.shape[0],
+                                columns=data.shape[1],
+                                target_column=target_column
+                            )
+                            
+                            if dataset_success:
+                                st.session_state.dataset_id = dataset_id
+                                st.success("Data preprocessing completed and dataset saved to database!")
+                            else:
+                                st.warning("Data preprocessing completed but failed to save to database.")
+                        else:
+                            st.success("Data preprocessing completed successfully!")
+                            st.warning("Dataset not saved to database: User profile not found.")
+                    except Exception as e:
+                        st.success("Data preprocessing completed successfully!")
+                        st.warning(f"Database operation failed: {str(e)}")
                     
                     # Show class distribution
                     st.subheader("Target Variable Distribution")
@@ -256,7 +325,58 @@ elif page == "Model Training":
                             "y_train": y_train,
                             "y_test": y_test
                         }
-                        st.success("Logistic Regression model trained successfully!")
+                        
+                        # Save model to file and database
+                        try:
+                            # Get user info
+                            user = get_user_by_username(st.session_state.username)
+                            
+                            # Directory for models
+                            os.makedirs("models", exist_ok=True)
+                            
+                            # Model file path
+                            model_file = f"models/logistic_regression_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pkl"
+                            
+                            # Save model to file
+                            with open(model_file, 'wb') as f:
+                                pickle.dump(model, f)
+                            
+                            # Preliminary evaluation metrics
+                            evaluation_results = evaluate_model(model, X_train, X_test, y_train, y_test)
+                            
+                            # Save model to database if user exists
+                            if user and hasattr(user, 'id') and 'dataset_id' in st.session_state:
+                                dataset_id = st.session_state.dataset_id
+                                
+                                model_success, model_id = add_model(
+                                    name=f"Logistic Regression Model ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')})",
+                                    description=f"C={C}, solver={solver}, max_iter={max_iter}",
+                                    user_id=user.id,
+                                    dataset_id=dataset_id,
+                                    model_type="Logistic Regression",
+                                    accuracy=evaluation_results['accuracy'],
+                                    precision=evaluation_results['precision'],
+                                    recall=evaluation_results['recall'],
+                                    f1_score=evaluation_results['f1'],
+                                    auc_score=evaluation_results['auc'],
+                                    file_path=model_file
+                                )
+                                
+                                if model_success:
+                                    st.session_state.model_id = model_id
+                                    st.success("Logistic Regression model trained successfully and saved to database!")
+                                else:
+                                    st.success("Logistic Regression model trained successfully!")
+                                    st.warning("Failed to save model to database.")
+                            elif not user or not hasattr(user, 'id'):
+                                st.success("Logistic Regression model trained successfully and saved to file!")
+                                st.warning("Model not saved to database: User profile not found.")
+                            else:
+                                st.success("Logistic Regression model trained successfully and saved to file!")
+                                st.warning("Model not saved to database: No dataset ID found.")
+                        except Exception as e:
+                            st.success("Logistic Regression model trained successfully!")
+                            st.warning(f"Failed to save model: {str(e)}")
             
             elif model_type == "Random Forest":
                 n_estimators = st.number_input("Number of trees", 10, 500, 100, 10)
@@ -277,7 +397,53 @@ elif page == "Model Training":
                             "y_train": y_train,
                             "y_test": y_test
                         }
-                        st.success("Random Forest model trained successfully!")
+                        
+                        # Save model to file and database
+                        try:
+                            # Get user info
+                            user = get_user_by_username(st.session_state.username)
+                            
+                            # Directory for models
+                            os.makedirs("models", exist_ok=True)
+                            
+                            # Model file path
+                            model_file = f"models/random_forest_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pkl"
+                            
+                            # Save model to file
+                            with open(model_file, 'wb') as f:
+                                pickle.dump(model, f)
+                            
+                            # Save model to database
+                            if 'dataset_id' in st.session_state:
+                                dataset_id = st.session_state.dataset_id
+                                
+                                # Preliminary evaluation metrics
+                                evaluation_results = evaluate_model(model, X_train, X_test, y_train, y_test)
+                                
+                                model_success, model_id = add_model(
+                                    name=f"Random Forest Model ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')})",
+                                    description=f"n_estimators={n_estimators}, max_depth={max_depth}, min_samples_split={min_samples_split}, min_samples_leaf={min_samples_leaf}",
+                                    user_id=user.id,
+                                    dataset_id=dataset_id,
+                                    model_type="Random Forest",
+                                    accuracy=evaluation_results['accuracy'],
+                                    precision=evaluation_results['precision'],
+                                    recall=evaluation_results['recall'],
+                                    f1_score=evaluation_results['f1'],
+                                    auc_score=evaluation_results['auc'],
+                                    file_path=model_file
+                                )
+                                
+                                if model_success:
+                                    st.session_state.model_id = model_id
+                                    st.success("Random Forest model trained successfully and saved to database!")
+                                else:
+                                    st.success("Random Forest model trained successfully but failed to save to database!")
+                            else:
+                                st.success("Random Forest model trained successfully! (Dataset not found in database)")
+                        except Exception as e:
+                            st.success("Random Forest model trained successfully!")
+                            st.warning(f"Failed to save model to database: {str(e)}")
             
             elif model_type == "XGBoost":
                 n_estimators = st.number_input("Number of boosting rounds", 10, 500, 100, 10)
@@ -298,7 +464,53 @@ elif page == "Model Training":
                             "y_train": y_train,
                             "y_test": y_test
                         }
-                        st.success("XGBoost model trained successfully!")
+                        
+                        # Save model to file and database
+                        try:
+                            # Get user info
+                            user = get_user_by_username(st.session_state.username)
+                            
+                            # Directory for models
+                            os.makedirs("models", exist_ok=True)
+                            
+                            # Model file path
+                            model_file = f"models/xgboost_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pkl"
+                            
+                            # Save model to file
+                            with open(model_file, 'wb') as f:
+                                pickle.dump(model, f)
+                            
+                            # Save model to database
+                            if 'dataset_id' in st.session_state:
+                                dataset_id = st.session_state.dataset_id
+                                
+                                # Preliminary evaluation metrics
+                                evaluation_results = evaluate_model(model, X_train, X_test, y_train, y_test)
+                                
+                                model_success, model_id = add_model(
+                                    name=f"XGBoost Model ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M')})",
+                                    description=f"n_estimators={n_estimators}, max_depth={max_depth}, learning_rate={learning_rate}, subsample={subsample}",
+                                    user_id=user.id,
+                                    dataset_id=dataset_id,
+                                    model_type="XGBoost",
+                                    accuracy=evaluation_results['accuracy'],
+                                    precision=evaluation_results['precision'],
+                                    recall=evaluation_results['recall'],
+                                    f1_score=evaluation_results['f1'],
+                                    auc_score=evaluation_results['auc'],
+                                    file_path=model_file
+                                )
+                                
+                                if model_success:
+                                    st.session_state.model_id = model_id
+                                    st.success("XGBoost model trained successfully and saved to database!")
+                                else:
+                                    st.success("XGBoost model trained successfully but failed to save to database!")
+                            else:
+                                st.success("XGBoost model trained successfully! (Dataset not found in database)")
+                        except Exception as e:
+                            st.success("XGBoost model trained successfully!")
+                            st.warning(f"Failed to save model to database: {str(e)}")
         
         # Display trained models
         st.subheader("Trained Models")
