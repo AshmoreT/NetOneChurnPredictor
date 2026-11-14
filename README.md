@@ -16,7 +16,6 @@ NetOneChurnPredictor is a Python-based machine learning application built with S
 - Streamlit (web framework)
 - Machine Learning Libraries (scikit-learn, pandas, numpy)
 - Database (integrated but not specified)
-- Replit (deployment platform)
 - UV package manager
   
 
