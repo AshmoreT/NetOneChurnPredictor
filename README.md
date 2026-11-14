@@ -1,21 +1,26 @@
- 
-NetOneChurnPredictor is a Python-based machine learning application built with Streamlit that predicts customer churn for NetOne. The project includes data preprocessing utilities, model training capabilities, database integration for storing user data and training information, and a web interface for interactive predictions. It features offline functionality optimization and handles data imbalances robustly.
+Project Overview
 
-### Main Function Points
-- Customer churn prediction using machine learning models
-- Interactive web interface via Streamlit for easy access
-- Data preprocessing and feature engineering utilities
-- Model training and evaluation capabilities
-- Database integration for persistent data storage
-- User feedback collection and handling
-- Offline functionality support with minimal online dependencies
-- Data imbalance handling for improved model performance
+A machine learning-based customer churn prediction and analytics application developed to identify customers who are likely to discontinue their telecommunications services with NetOne.
 
-### Technology Stack
-- Python (100%)
-- Streamlit (web framework)
-- Machine Learning Libraries (scikit-learn, pandas, numpy)
-- Database (integrated but not specified)
-- UV package manager
+The project applies data preprocessing, exploratory data analysis, feature engineering and Random Forest classification to examine customer behaviour and predict potential churn.
+
+Business Problem
+
+Customer churn presents a challenge for telecommunications companies because losing existing customers can affect revenue, customer retention and long-term business performance.
+
+This project explores how predictive analytics can help identify customers at risk of leaving, enabling management to make more informed customer retention decisions.
+
+Project Objectives
+- Identify customer characteristics associated with churn.
+- Analyse customer usage, billing and complaint patterns.
+- Develop a machine learning model to predict customer churn.
+- Evaluate model performance using classification metrics.
+- Demonstrate how predictive insights can support retention strategies.
+
+  
+Technology Stack
+
+Python, Pandas, NumPy, Scikit-learn, Matplotlib, Seaborn, Plotly, Streamlit and SQLite
+
   
 
